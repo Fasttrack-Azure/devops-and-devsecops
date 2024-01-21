@@ -34,12 +34,19 @@ These are hands-on resources to help you learn Kubernetes.
 - [Monitoring](labs/monitoring/README.md)
 - [Logging](labs/logging/README.md)
 
+## Real Kubernetes
+
+- [Troubleshooting](labs/troubleshooting/README.md)
+
 ## Continuous Integration and Continuous Deployment (CI/CD)
 
 - [Helm](labs/helm/README.md)
 - [Jenkins](labs/jenkins/README.md)
 - [GitHub Actions](labs/actions/README.md)
 
-## Real Kubernetes
+## Security in Depth
 
-- [Troubleshooting](labs/troubleshooting/README.md)
+- [Static analysis](./labs/static-analysis/README.md)
+- [Security scanning](./labs/scanning/README.md)
+- [Building a golden image library](./labs/golden-images/README.md)
+- [Container security controls](./labs/container-security/README.md)

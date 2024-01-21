@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pi-np
+  labels:
+    kubernetes.courselabs.co: container-security
+spec:
+  selector:
+    app: pi-web
+  ports:
+    - name: http
+      port: 8020
+      targetPort: 80
+      nodePort: 30020
+  type: NodePort
