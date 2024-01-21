@@ -1,9 +1,9 @@
 # Lab Hints
 
-You don't need to be a Go expert to optimize this image. The current Dockerfile uses an older version of the Go SDK, which is based on an old version of Alpine. 
+Your new job definition will be very similar to the `manual-gate` job you created. It would be nice if you can copy the new job from the old one...
 
-Find the image details on the registry and you'll see you can use the latest SDK and the latest OS with a change to the first stage of the Dockerfile.
+When you run the job it will show lots of output in the console window. Dig through the logs and you should find the problem.
 
-For the second stage - you can build Docker images which have no base OS image at all. There's a special `FROM` instruction you can use for that, which uses an image name that isn't a real image.
+When you fix your Jenkinsfile you'll need to push changes and that will trigger a new build.
 
 > Need more? Here's the [solution](solution.md).

@@ -1,6 +1,6 @@
-Welcome to the Kubernetes labs.
+Welcome to the DevOps and DevSecOps labs.
 
-These are hands-on resources to help you learn Kubernetes.
+These are hands-on resources to help you learn DevOps, DevSecOps and Kubernetes.
 
 ## Pre-reqs
 

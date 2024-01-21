@@ -2,4 +2,4 @@
 
 Labs and exercises to help you learn Kubernetes.
 
-Live at https://devops-and-devsecops.courselabs.co.
+Live at https://fasttrack-azure.github.io/devops-and-devsecops/labs/jenkins/.

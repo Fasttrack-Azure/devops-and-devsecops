@@ -1,291 +1,249 @@
-# CI/CD with Jenkins
+# Automation with Jenkins
 
-Jenkins is a popular and powerful automation server. You can run Jenkins in your Kubernetes cluster as part of a deployment infrastructure to build and push Docker images, and update the running applications in your cluster.
+[Jenkins](https://jenkins.io) is probably the most popular automation server around - but popular in terms of being well used rather than being liked. It's been around a long time and one of the main features is its extensibility: it has a plugin framework with over [1800 published plugins](https://plugins.jenkins.io) which you can use to build any type of application, or integrate with any third-party system. There's a web UI you can use to define jobs, which get stored on the server's filesystem.
 
-These exercises run a full local build setup in Kubernetes:
-
-- [Gogs](https://gogs.io/) - a Git server to host your project source code and specs
-- [BuildKit](https://github.com/moby/buildkit) - to build container images from Dockerfiles
-- [Jenkins](https://www.jenkins.io) - to fetch code from Gogs and build images with BuildKit
-
-You don't typically run all this yourself, but it's very useful to see how it all fits together and have it as a backup option if your other services go down.
+The UI and the plugins are one of the main reasons people don't like Jenkins. Plugins are prone to security flaws so they need frequent updates, but they can be fiddly to automate. You tend to find Jenkins servers are maintained long after they should have been decomissioned, because no-one's sure if they'd be able to recreate the exact set of plugins and load all the job definitions from the old server. We'll use Jenkins in a different way, with minimal plugins and job definitions stored in source control.
 
 ## Reference
 
-- [Using images from a private registry in Pods](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/)
+- [Jenkinsfile walkthrough](https://www.jenkins.io/doc/book/pipeline/jenkinsfile/)
 
-- [Getting started with Jenkins pipelines](https://www.jenkins.io/doc/book/pipeline/getting-started/)
+- [Using Declarative Jenkins Pipelines](https://www.pluralsight.com/courses/using-declarative-jenkins-pipelines) - Pluralsight course
 
-- [Using Declarative Jenkins Pipelines](https://app.pluralsight.com/library/courses/using-declarative-jenkins-pipelines/table-of-contents) - Pluralsight course to learn more about Jenkins
+- [Using and Managing Jenkins Plugins](https://www.pluralsight.com/courses/using-managing-jenkins-plugins) - Pluralsight course
 
-## Deploy the build stack
+## Running Jenkins
 
-The build components will all run as Deployments in a custom namespace:
-
-- [infrastructure/gogs.yaml](./specs/infrastructure/gogs.yaml) - defines the Git server, and a NodePort to access it
-
-- [infrastructure/buildkitd.yaml](./specs/infrastructure/buildkitd.yaml) - runs a BuildKit server, with a ClusterIP Service for internal access
-
-- [infrastructure/jenkins.yaml](./specs/infrastructure/jenkins.yaml) - runs Jenkins with a NodePort to access on port 30008, plus setup scripts in a ConfigMap and RBAC rules for Jenkins to use the Kubernetes API server
-
-Start by deploying all the infrastructure components:
+Start by running Jenkins inside a Docker container, along with a local Git server (using Gogs):
 
 ```
-kubectl apply -f labs/jenkins/specs/infrastructure
+docker-compose -f labs/jenkins/infra/docker-compose.yml up -d
 ```
 
-📋 Check on the Deployments. Not all the Pods are running - what's the problem?
+> This is a custom setup of Jenkins with a few plugins already installed. It's built from [this Dockerfile](https://github.com/courselabs/docker-images/blob/main/src/jenkins/Dockerfile) if you want to see how it's automated.
+
+Browse to Jenkins at http://localhost:8080. You may see a page saying "Jenkins is getting ready to work" - it can take a few minutes for a new server to come online. When you see the home page, click the log in link and sign in with these admin credentials:
+
+- username: `courselabs`
+- password: `student`
+
+Check out the UI - it's slightly "web 1.0". The left nav takes you to the main options, including the menu to manage Jenkins; the central section will show a list of jobs once you have created some. 
+
+## Creating a Freestyle Job
+
+We'll create a classic Jenkins job - using the freestyle type where you build up the steps using the web UI:
+
+- click _Create a job_ on the home screen
+- call the new job `lab-1`
+- set the job type to be _Freestyle project_
+- click _OK_
+
+This creates the new job. There are different sections of the UI which represent typical stages of a build - source code connection details, the build triggers and the build steps.
+
+We'll use this job to run a simple script which prints some text:
+
+- scroll down to the _Build_ section
+- click _Add build step_
+- select _Execute shell_
+- paste this into the _Command_ box:
+
+```
+echo "This is build number: $BUILD_NUMBER of job: $JOB_NAME"
+```
+
+- click _Save_
+
+> Jenkins populates [a set of environment variables](http://localhost:8080/env-vars.html/) when it runs the job, which are accessible in the job steps. This script prints out the build number - which is an incrementing count of the number of times the job has run - and the job name.
+
+Now you're in the main job window. The left nav lets you configure the job again, and the central section will show the recent runs of the job.
+
+Click _Build Now_ to run the job. When the build finishes check the output in http://localhost:8080/job/lab-1/1/console
+
+📋 Build the job again - how is the output different?
 
 <details>
   <summary>Not sure?</summary>
 
-Check the Deployments:
+Click _Build Now_ again. When the job completes you can see the output at http://localhost:8080/job/lab-1/2/console
 
-```
-kubectl get deploy -n infra
-```
-
-The Gogs and BuildKit Deployments get up to scale, but the Jenkins Deployment stays at 0/1 Ready.
-
-Check the Pod:
-
-```
-kubectl get po -n infra -l app=jenkins
-```
-
-It's stuck at the `ContainerCreating` status. Describe the Pod and you'll see it needs a Secret: _secret "registry-creds" not found_.
+The job name is the same, but the number has incremented.
 
 </details><br/>
 
-Jenkins will run a pipeline to build and push Docker images using BuildKit. For that it needs authentication to Docker Hub - or whichever image registry you use.
+There are other tools installed in this Jenkins server, which you would use in a real pipeline. What happens if you print the version of the Java compiler, the Docker command line or the Kubernetes command line in the script?
 
-Just like the [BuildKit lab](../../labs/buildkit/README.md), this is sensitive stuff so we'll use variables to hide your password. 
-
-> **Secrets are namespaced, and you can't mount a Secret from one namespace to a Pod in another namespace**.
-
-_On Windows, use PowerShell to store your credentials:_
-
-```
-$REGISTRY_SERVER='https://index.docker.io/v1/'
-$REGISTRY_USER=Read-Host -Prompt 'Username'
-$password = Read-Host -Prompt 'Password'-AsSecureString
-$REGISTRY_PASSWORD = [System.Net.NetworkCredential]::new("", $password).Password
-```
-
-_OR on MacOS or Linux_:
-
-```
-REGISTRY_SERVER='https://index.docker.io/v1/'
-read REGISTRY_USER
-read -s REGISTRY_PASSWORD
-```
-
-📋 Now create a registry Secret in Kubernetes called `registry-creds` in the `infra` namespace, using the variables you've stored.
+📋 Edit the job to print the version numbers of `javac`, `docker` and `kubectl`.
 
 <details>
   <summary>Not sure how?</summary>
 
+Click _Configure_ in the job page to edit the job. 
+
+You can add a new build step or update the _Command_ box in the existing step to print version numbers:
+
 ```
-kubectl create secret docker-registry -n infra registry-creds --docker-server=$REGISTRY_SERVER --docker-username=$REGISTRY_USER --docker-password=$REGISTRY_PASSWORD
+docker version
+
+javac --version
+
+kubectl version
 ```
+
+Click _Save_.
 
 </details><br/>
 
-Your Jenkins Pod may be in a backoff state by now, so replace it with a new rollout:
+When you build the updated job, it will fail. Shell commands always return with an exit code, usually 0 means OK and non-zero means the command failed. The Kubernetes CLI errors because it can't connect to a Kubernetes environment. The exit code is non-zero so Jenkins takes that as a failure so the job step fails. 
+
+If there were other steps after this one, they wouldn't run because the job exits when a step fails.
+
+> This is the old-school way of using Jenkins. Where does the job definition live? How would you migrate it to a new Jenkins server? The better option is to use [pipelines](https://www.jenkins.io/doc/book/pipeline/), which use plugins that are already installed on this server.
+
+## Pipelines and the Blue Ocean UI
+
+The pipeline feature comes with the `workflow-aggregator` and `blueocean` plugins. Those give you the new way of defining and managing jobs, where the job definition is stored in source control.
+
+Browse to the Jenkins homepage and select _Open Blue Ocean_ from the left nav. You'll see your original build job - click to open it in the new UI, where you can start a new build and view the logs.
+
+We'll create a new pipeline job instead. Browse back to main Blue Ocean UI at http://localhost:8080/blue and click _New pipeline_.
+
+📋 Set up the new pipeline to connect to your Git server, running at http://gogs:3000/courselabs/labs.git - it uses the same credentials as Jenkins.
+
+<details>
+  <summary>Not sure how?</summary>
+
+- Select _Git_ in the source code list (not _GitHub_! we're using our own Git server)
+
+- Set the _Repository URL_ to http://gogs:3000/courselabs/labs.git 
+
+- Set _Username_ to `courselabs` and _Password_ to `student`
+
+- Click _Create Credential_ - the login details are stored in Jenkins
+
+- Click _Create Pipeline_
+
+- Click _Create Pipeline_ again :)
+
+</details><br/>
+
+> The Jenkins container is on the same Docker network as the Gogs container, so it can access it using the DNS name `gogs`. 
+
+Your new pipeline starts empty. Click the plus icon `+` in the pipeline visualizer to add a new stage. Call the stage `audit`. Then click _Add step_ to add a step to the stage:
+
+- Select _Shell Script_ as the step type
+
+- Paste this into the script text box:
 
 ```
-kubectl rollout restart -n infra deploy/jenkins
+echo "This is build number: $BUILD_NUMBER of job: $JOB_NAME"
+
+javac --version
 ```
 
-The new Pod still won't start :)
+> The UI may not preserve the line spaces correctly, you can ignore that.
 
-📋 What's wrong with the Pod now?
+Click _Save_ and then _Save & run_. Jenkins creates the pipeline definition and uploads it to the Git server. Wait a moment and the build will automatically start. The build should succeed - check the output to see the message.
+
+📋 Browse to your Git repo at http://localhost:3000/courselabs/labs - where is the build definition stored?
 
 <details>
   <summary>Not sure?</summary>
 
-Check the Pods and you'll see they're in `CreateContainerConfigError` status:
-
-```
-kubectl get po -n infra -l app=jenkins
-```
-
-Describe the latest Pod and you'll see there's one more dependency needed: _Error: configmap "build-config" not found_
+There's a single file in the repo called `Jenkinsfile`. Open it and you'll see the pipeline definition, with the stage called `audit` containing the shell script to print version numbers.
 
 </details><br/>
 
-We need a ConfigMap to store details of the image name to use for the build - the name includes the registry domain and your user (or group) name. 
+The UI to build a pipeline is useful, but typically you'll create the Jenkinsfile in your source repo and edit the text directly when you change the pipeline. 
 
-Set your registry domain and repository name in a ConfigMap, **be sure to use your own registry ID**:
+## Storing Pipelines in Source Code
 
-```
-kubectl create configmap -n infra build-config --from-literal=RELEASE_VERSION=21.09 --from-literal=REGISTRY_DOMAIN=docker.io  --from-literal=REGISTRY_REPOSITORY=<your-registry-id>
-```
+We'll use [this Jenkinsfile](./manual-gate/Jenkinsfile) for our next build. It has multiple stages but it should be fairly clear what it's doing. An interesting point is the _Deploy_ stage which used an `input` block to ask a user for confirmation.
 
-Now you'll see the Jenkins Deployment come up to scale:
+To run the pipeline, first we'll push the `devsecops` repo to our local Git server so Jenkins can use it.
 
-```
-kubectl get deploy -n infra 
-```
+Open Gogs at http://localhost:3000 and sign in with username `courselabs` and password `student`. Under the _My Repositories_ section you'll see the `labs` repository; click the plus icon to create a new repo:
 
-## Push the source code to your local Git server
+- set _Repository Name_ to `devsecops`
 
-The local build infrastructure is all running, and Jenkins is configured with a project which fetches a Git repo from the Gogs server.
+- leave all other options with the defaults
 
-To run a build we need to push our local code to Gogs. You can do this with the Git CLI - these commands adds the local server as a new remote and push a copy of the repo there:
+- click _Create Repository_
+
+Now you can add your local Gogs server as a remote for the course repo, and push the contents:
 
 ```
-# add the local Git server:
-git remote add labs-jenkins http://localhost:30030/kiamol/kiamol.git
+git remote add gogs http://localhost:3000/courselabs/devsecops.git
 
-# and push:
-git push labs-jenkins main
+git push gogs main
 ```
 
-> You'll need to authenticate with the server, use `kiamol` as the username and password.
+> You'll need to log in with your Git client - use the usual credentials.
 
-Now all the code from this repo is in your local Git server. You can browse here and see the build pipeline: http://localhost:30030/kiamol/kiamol/src/main/labs/jenkins/project/Jenkinsfile.
+Check the repo at http://localhost:3000/courselabs/devsecops, and you'll see all the lab content. This is like your own private GitHub.
 
-This is a Jenkins pipeline definition. If you're not familiar with the syntax, you can see we're mostly running shell scripts which use the BuildKit CLI to build and push images.
+Browse back to Jenkins at http://localhost:8080/view/all/newJob to create a new job:
 
-## Run the pipeline in Jenkins
+- call it `manual-gate`
 
-Browse to Jenkins at http://localhost:30008. Click _log in_ at the top right of the screen, and use `kiamol` as the username and password.
+- select _Pipeline_ as the job type
 
-Now browse to project at http://localhost:30008/job/kiamol/ (the project is created in the setup scripts in [jenkins.yaml](./specs/infrastructure/jenkins.yaml)).
+- click _OK_
 
-Click _Enable_ and then click _Build Now_.
+This is the classic UI - you can still use it to work with new pipelines. Scroll to the _Pipeline_ section:
 
-The build should complete sucessfully:
+- select _Pipeline script from SCM_ in the dropdown
+- set the SCM to _Git_
+- set the _Repository URL_ to `http://gogs:3000/courselabs/devsecops.git`
+- change the _Branch Specifier_ from `*/master` to `refs/heads/main`
+- set the _Script Path_ to `labs/jenkins/manual-gate/Jenkinsfile`
 
-- Jenkins pulls the source code from Gogs
-- it prints the version of the tools it's using
-- it runs `buildctl` to build an image with the BuildKit server
-- the image is built from the [whoami Dockerfile](./project/src/Dockerfile) 
-- the image tag uses your registry configuration, and adds the Jenkins build number
-- the image is pushed to your registry
+Save and run the build. It will pause after the _Test_ stage and wait for user input.
 
-If it all goes well, you should see the push information in the logs, and you can browse to Docker Hub and see your image - e.g. https://hub.docker.com/r/courselabs/whoami-lab/tags.
-
-> If not check the Jenkins project logs - any problems are likely to be authentication using the Secret, or the image name compiled from the ConfigMap.
-
-
-## Add the deployment stage
-
-That's the CI part done - if the project had unit tests we could run them as another stage in the Dockerfile and be confident the built image was functionally correct.
-
-Now we want to add Continuous Deployment. There's a Helm chart for the project which we can run manually to test the release:
-
-- [whoami/templates/service.yaml](./project/helm/whoami/templates/service.yaml) - the Service uses variables for the type and port
-- [whoami/templates/deployment.yaml](./project/helm/whoami/templates/deployment.yaml) - uses variables for the image name and a flag for using a private image registry
-- [whoami/values.yaml](./project/helm/whoami/values.yaml) - sets default values for the chart
-- [integration-test.yaml](./project/helm/integration-test.yaml) - provides alternative values for running a test environment
-
-Install a local release to verify the chart - using a public image:
-
-```
-helm upgrade --install whoami-dev --set serverImage=docker.io/courselabs/whoami-lab:21.09-1 labs/jenkins/project/helm/whoami
-```
-
-When the app is running, test it at http://localhost:30028
-
-We'll add the CD stage to the build, deploying to a new namespace. 
-
-📋 Create a namespace called `integration-test` and label it with `kubernetes.courselabs.co=jenkins` so we can easily clean up at the end.
+📋 In the job UI is it clear how you can progress the _Deploy_ stage and complete the build?
 
 <details>
-  <summary>Not sure how?</summary>
+  <summary>Not sure?</summary>
 
-```
-kubectl create ns integration-test 
+You'll see boxes representing each stage of the pipeline - earlier stages are green to show they've suceeded. The _Deploy_ box is blue and it says _Paused_:
 
-kubectl label ns integration-test kubernetes.courselabs.co=jenkins
-```
+![](/img/jenkins-manual-gate.png)
+
+Click the blue box and you'll see the confirmation window with the options defined in the Jenkinsfile. Click _Do it!_ and the build will continue.
 
 </details><br/>
 
-We want to use the images Jenkins pushes to run the app in the test namespace - so that namespace will also need a registry authenticaion Secret to pull images.
-
-Create a Secret using the same registry credentials:
-
-```
-kubectl create secret docker-registry -n integration-test registry-creds --docker-server=$REGISTRY_SERVER --docker-username=$REGISTRY_USER --docker-password=$REGISTRY_PASSWORD
-```
-
-Now open the [Jenkinsfile](./project/Jenkinsfile), scroll to the end and uncomment the stage called _Deploy to test namespace_: delete the `/*` line at the start of the stage and the `*/` line at the end.
-
-Push your changes to Gogs, and the pipeline will be updated in Jenkins:
-
-```
-# remove /* and */ comment lines from Jenkinsfile
-
-git add labs/jenkins/project/Jenkinsfile
-
-git commit -m 'Enable CD'
-
-git push labs-jenkins
-```
-
-Browse back to your build at http://localhost:30008/job/kiamol/ - click _Build Now_ a few times to push images with different version numbers.
-
-Check the CI/CD deployment works and is running the latest version:
-
-```
-helm ls -n integration-test
-
-curl localhost:30029
-
-kubectl get rs -n integration-test -o wide
-```
-
-> You should see the updated build versions in the image tags.
+Input blocks are very useful as you can automate the full deployment in the pipeline, but still have manual approval for different stages.
 
 ## Lab
 
-This lab gets you to make use of the CI/CD pipeline to update the whoami app. The [Dockerfile](./project/src/Dockerfile) for the app needs updating and optimizing:
+Now it's your turn :) There's another pipeline defined in this repo which builds and runs a simple Java app. The [Jenkinsfile](hello-world/Jenkinsfile) is at `labs/jenkins/hello-world/Jenkinsfile`:
 
-- the build stage should use the latest Go SDK on the latest version of the Alpine OS
-- the final image doesn't need any OS tools, so it can be `FROM` a minimal image
+- create a new job to run that pipeline
+- include a build trigger to poll SCM for changes every minute
+- the build will fail :) You'll need to update the Jenkinsfile and push changes to your Gogs server to fix it
+- when you get the build running, where can you find the compiled binaries?
 
-Make your changes to the Dockerfile and check the image builds locally. Then push your changes to Gogs and confirm the app updates to your new image version and works correctly.
+Use these commands to push your updated Jenkinsfile:
 
-Pull your latest image and the one before that - is there a size difference?
+```
+git add labs/jenkins/hello-world/Jenkinsfile
+git commit -m 'Lab solution'
+git push gogs
+```
 
 > Stuck? Try [hints](hints.md) or check the [solution](solution.md).
 
 ___
-
 ## Cleanup
 
-Remove the Helm releases:
+Cleanup by removing all containers:
 
 ```
-helm uninstall whoami-dev
-
-helm uninstall whoami-int -n integration-test
+docker rm -f $(docker ps -aq)
 ```
 
-And all the other components:
+And remove the Gogs remote:
 
 ```
-kubectl delete ns -l kubernetes.courselabs.co=jenkins
-```
-
-Then remove your Git remote:
-
-```
-git remote rm labs-jenkins
-```
-
-👩‍🏫 **For the instructor** - remember to reset the Dockerfile and Jenkinsfile for the next class :)
-
-```
-cp labs/jenkins/project/src/Dockerfile.original labs/jenkins/project/src/Dockerfile
-cp labs/jenkins/project/Jenkinsfile.original labs/jenkins/project/Jenkinsfile
-
-git add labs/jenkins/project/src/Dockerfile
-git add labs/jenkins/project/Jenkinsfile
-
-git commit -m 'Reset Jenkins lab'
-git push origin
+git remote rm gogs
 ```

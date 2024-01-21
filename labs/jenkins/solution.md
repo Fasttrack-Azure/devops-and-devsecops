@@ -1,45 +1,33 @@
 # Lab Solution
 
-The only changes you need to make here are to the `FROM` lines in the Dockerfile.
+The simplest way is to copy the previous job:
 
-In my [sample solution](./solution/Dockerfile) I've changed both lines:
+- browse to http://localhost:8080/view/all/newJob
+- set the job name to be `hello-world`
+- select _Pipeline_ as the job type
+- in the _Copy from_ box, enter `manual-gate`
 
-```
-FROM golang:1.17.1-alpine3.14 AS builder
-# ...
-FROM scratch
-```
-
-That's the latest [official Go image](https://hub.docker.com/_/golang?tab=tags&page=1&ordering=last_updated) version using the latest Alpine version for the builder stage. 
-
-The final stage uses [scratch](https://hub.docker.com/_/scratch/), which means there is no base image.
-
-You can copy the solution over the project Dockerfile, and push changes to start a new build:
+In the build definintion, scroll to _Build triggers_ and select _Poll SCM_. That sets up a schedule to check for changes from the Git server; enter this in the _Schedule_ box:
 
 ```
-cp labs/jenkins/solution/Dockerfile labs/jenkins/project/src/
-
-git add labs/jenkins/project/src/Dockerfile
-
-git commit -m 'Jenkins lab solution'
-
-git push labs-jenkins
+* * * * * 
 ```
 
-Check the build at http://localhost:30008/job/kiamol/
+> This means Jenkins will check the Git repo every minute, and if there have been any changes since the last build then a new one is triggered.
 
-> The new build should trigger an update and when the Helm upgrade has finished, the app should work in the same way 
+Change the script path to `labs/jenkins/hello-world/Jenkinsfile`, then save and build the job - it fails.
 
-Test the app with `curl localhost:30028`. Then pull your two latest images and compare them. My optimized image is 1/3 smaller than the previous one:
+Check the logs or the console output - the _Test_ stage fails with this log line:
 
-```
-> docker image ls courselabs/whoami-lab
-REPOSITORY              TAG       IMAGE ID       CREATED   
-           SIZE
+_Error: Could not find or load main class HelloWorkd.java_
 
-courselabs/whoami-lab   21.09-4   061235acbb98   About a minute ago   8.22MB
+`HelloWorkd`> Looks like a typo :)
 
-courselabs/whoami-lab   21.09-3   4deca9963c2a   5 hours ago          12.7MB
-```
+Change the line `java HelloWorkd` in the Jenkinsfile to `java HelloWorld` in the file `labs/jenkins/hello-world/Jenkinsfile`. My fixes are in [this Jenkinsfile](./lab\Jenkinsfile)
 
-> Back to the [exercises](README.md)
+Then commit and push your changes. Back in Jenkins, wait for the build to trigger from the SCM change (or click _Build Now_). 
+
+All will be well. Check the output page for the build and you'll see a list of archived artifacts, containing the Java class file.
+
+___
+> Back to the [exercises](README.md).
