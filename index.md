@@ -13,6 +13,8 @@ These are hands-on resources to help you learn DevOps, DevSecOps and Kubernetes.
     - Install [Helm](https://helm.sh/docs/intro/install/), [ArgoCD](https://argoproj.github.io/argo-cd/getting_started/#2-download-argo-cd-cli) and [k3d](https://k3d.io/v4.4.8/#installation) command line tools
 - _Optional_
     - Install [Visual Studio Code](https://code.visualstudio.com) (free - Windows, macOS and Linux) to browse the repo and documentation
+- Download the slides
+    - [Slides](https://drive.google.com/drive/folders/1AMOXQ00MVHNFIoAp_nqEmar_uurELyf_?usp=sharing)
 
 ## Core Kubernetes
 
