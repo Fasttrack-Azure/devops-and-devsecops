@@ -14,6 +14,10 @@ These are hands-on resources to help you learn DevOps, DevSecOps and Kubernetes.
     - Install [Visual Studio Code](https://code.visualstudio.com) (free - Windows, macOS and Linux) to browse the repo and documentation
 - Download the slides
     - [Slides](https://drive.google.com/drive/folders/1AMOXQ00MVHNFIoAp_nqEmar_uurELyf_?usp=sharing)
+- Lab VMs: To access training lab environment, please login through below link using username assigned to you 
+    - [VM Access Usernames](https://docs.google.com/spreadsheets/d/1eGg5gEBJAYJaoWb1OsHxu05XVjzFW-MGUm-P5QWhDVI/edit?usp=sharing)
+    - Lab VMs are available on http://labs.datacouch.io/pluralsight/ 
+    - Password: student-$45#9
 
 ## Core Kubernetes
 
