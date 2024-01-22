@@ -82,5 +82,6 @@ jobs:
       run: kubectl apply -f service.yaml
 
 ```
+
 - Commit the .github/workflows/cicd.yml file to your repository.
 - In your repository, select Actions and confirm a workflow is running. Then, confirm the workflow has a green checkmark and the updated application is deployed to your cluster.
