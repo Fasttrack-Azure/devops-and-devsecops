@@ -20,13 +20,7 @@ These are hands-on resources to help you learn DevOps, DevSecOps and Kubernetes.
 - [Pods](labs/pods/README.md)
 - [Services](labs/services/README.md)
 - [Deployments](labs/deployments/README.md)
-
-## Application Modelling
-
 - [ConfigMaps](labs/configmaps/README.md)
-- [Secrets](labs/secrets/README.md)
-- [Namespaces](labs/namespaces/README.md)
-
 
 ## Operating Kubernetes
 
@@ -41,7 +35,6 @@ These are hands-on resources to help you learn DevOps, DevSecOps and Kubernetes.
 ## Continuous Integration and Continuous Deployment (CI/CD)
 
 - [Helm](labs/helm/README.md)
-- [Jenkins](labs/jenkins/README.md)
 - [GitHub Actions](labs/actions/README.md)
 
 ## Security in Depth
